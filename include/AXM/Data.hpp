@@ -1,10 +1,12 @@
 #pragma once
 
+#include "api.hpp"
 #include <stddef.h>
 
 namespace axm {
     
 enum Dtype {
+    NONE   = -1,
     FP32   = 0,
     FP64   = 1,
     FP16   = 2,
@@ -16,8 +18,8 @@ enum Dtype {
     UINT32 = 8
 };
 
-size_t size_of_dtype(Dtype dtype);
+AXM_API size_t size_of_dtype(Dtype dtype);
 
-const char* dtype_to_string(Dtype dtype);
+AXM_API const char* dtype_to_string(Dtype dtype);
 
 }

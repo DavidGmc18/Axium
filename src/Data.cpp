@@ -29,6 +29,7 @@ size_t size_of_dtype(Dtype dtype) {
 
 const char* dtype_to_string(Dtype dtype) {
     switch (dtype) {
+        case NONE:   return "NONE";
         case FP32:   return "FP32";
         case FP64:   return "FP64";
         case FP16:   return "FP16";

@@ -1,0 +1,11 @@
+CompileFlags:
+  Add:
+    - -std=c++17
+    - -DDEBUG
+    - -DAXIUM_EXPORTS
+
+    - --cuda-path=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9
+    - --cuda-gpu-arch=sm_86
+    - -IC:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\include
+
+    - -I../include

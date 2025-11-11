@@ -5,12 +5,20 @@
 
 namespace axm {
     
-struct Tensor : TensorDescriptor {
+struct AXM_API Tensor : TensorDescriptor {
+protected:
+    bool managed;
+    void alloc();
+    void dealloc();
+    void copy_data(void* src);
+public:
     void* data;
     Device device;
 
-    Tensor(std::initializer_list<size_t> dims_, Dtype dtype_ = FP32, Device device_ = CPU,
-        size_t alignment_ = 32, bool zero_init = true);
+    Tensor();
+    Tensor(std::initializer_list<size_t> dims_, Dtype dtype_ = FP32, Device device_ = CPU);
+    Tensor(TensorDescriptor& desc, Device device_ = CPU);
+    Tensor(Tensor& tensor, bool copy = false);
 
     ~Tensor();
 
@@ -18,8 +26,13 @@ struct Tensor : TensorDescriptor {
     void fromCuda();
 
     const TensorDescriptor& descriptor() const;
+   
+    const bool get_managed() const;
 
-    friend std::ostream& operator<<(std::ostream& os, const Tensor& t);
+    Tensor& operator=(const Tensor& tensor);
+    Tensor& operator=(const Tensor* tensor);
+
+    friend AXM_API std::ostream& operator<<(std::ostream& os, const Tensor& t);
 };
 
 }

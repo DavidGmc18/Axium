@@ -1,5 +1,6 @@
 #pragma once
 
+#include "api.hpp"
 #include <ostream>
 
 namespace axm {
@@ -9,6 +10,6 @@ enum Device {
     CUDA = 1
 };
 
-std::ostream& operator<<(std::ostream& os, Device device);
+AXM_API std::ostream& operator<<(std::ostream& os, Device device);
 
 }
