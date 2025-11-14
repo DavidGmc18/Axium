@@ -4,27 +4,17 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include <cuda_fp16.h>
-#include <cuda_bf16.h>
-
-static const size_t DtypeSizes[9] = {
-    sizeof(float),           // FLOAT32
-    sizeof(double),          // FLOAT64
-    sizeof(half),            // FLOAT16 (half)
-    sizeof(__nv_bfloat16),   // BFLOAT16 (nv_bfloat16)
-    sizeof(bool),            // BOOLEAN
-    sizeof(int8_t),          // INT8
-    sizeof(int32_t),         // INT32
-    sizeof(uint8_t),         // UINT8
-    sizeof(uint32_t)         // UINT32
-};
-
 namespace axm {
 
 size_t size_of_dtype(Dtype dtype) {
-    if (dtype < FP32 || dtype > UINT32)
-        fprintf(stderr, "Unknown Dtype %d\n", dtype);
-    return DtypeSizes[dtype];
+    switch (dtype) {
+        #define X(DTYPE, TYPE) case DTYPE: return sizeof(TYPE);
+                AXM_DTYPE_LIST
+        #undef X
+        default:
+            fprintf(stderr, "Unknown Dtype %d\n", dtype);
+            return 0;
+    }
 }
 
 const char* dtype_to_string(Dtype dtype) {
@@ -41,6 +31,17 @@ const char* dtype_to_string(Dtype dtype) {
         case UINT32: return "UINT32";
         default: return "UNKNOWN";
     }
+}
+
+// TODO do these work?
+std::ostream& operator<<(std::ostream& os, const half& h) {
+    os << __half2float(h);
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const __nv_bfloat16& bf) {
+    os << __bfloat162float(bf);
+    return os;
 }
 
 }

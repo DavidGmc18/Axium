@@ -31,6 +31,9 @@ public:
 
     Tensor& operator=(const Tensor& tensor);
     Tensor& operator=(const Tensor* tensor);
+    
+    template<typename T>
+    Tensor& operator=(const std::initializer_list<T> list);
 
     friend AXM_API std::ostream& operator<<(std::ostream& os, const Tensor& t);
 };

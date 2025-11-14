@@ -1,7 +1,6 @@
 #include "AXM/Tensor.hpp"
 #include "AXM/Data.hpp"
 #include "util.hpp"
-#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -149,6 +148,71 @@ Tensor& Tensor::operator=(const Tensor* tensor) {
     return *this;
 }
 
+template<typename T>
+Tensor& Tensor::operator=(const std::initializer_list<T> list) {
+    size_t list_bytes = list.size() * sizeof(T);
+    if (list_bytes > bytes) list_bytes = bytes;
+
+    size_t inner = dims[ndim - 1] * size_of_dtype(dtype);
+    size_t outer = list.size() / dims[ndim - 1];
+    size_t stride = strides[ndim - 2] * size_of_dtype(dtype);
+    size_t remainder = list_bytes % inner;
+
+    const char* src = reinterpret_cast<const char*>(list.begin());
+    char* dst = (char*)data;
+
+    switch (dtype) {
+        #define X(DTYPE, TYPE) case DTYPE:\
+            if constexpr (std::is_same_v<TYPE, T>) {\
+                printf("SAME -> %s\n", dtype_to_string(DTYPE));\
+                for (size_t i = 0; i < outer; ++i) {\
+                    memcpy(dst, src, inner);\
+                    dst += stride;\
+                    src += inner;\
+                }\
+                if (remainder) memcpy(dst, src, remainder);\
+                return *this;\
+            }\
+            break;
+        AXM_DTYPE_LIST
+        #undef X
+        default: break;
+    }
+
+    inner /= size_of_dtype(dtype);
+    remainder /= size_of_dtype(dtype);
+    size_t stride_src = inner * sizeof(T);
+    switch (dtype) {
+        #define X(DTYPE, TYPE) case DTYPE:\
+            if constexpr (std::is_convertible_v<T, TYPE>) {\
+                printf("CONVERT -> %s\n", dtype_to_string(DTYPE));\
+                for (size_t i = 0; i < outer; ++i) {\
+                    for (size_t j = 0; j < inner; ++j) {\
+                        reinterpret_cast<TYPE*>(dst)[j] = static_cast<TYPE>(src[j * sizeof(T)]);\
+                    }\
+                    dst += stride;\
+                    src += stride_src;\
+                }\
+                if (remainder)\
+                    for (size_t j = 0; j < remainder; ++j) {\
+                        reinterpret_cast<TYPE*>(dst)[j] = static_cast<TYPE>(src[j * sizeof(T)]);\
+                    }\
+                return *this;\
+            }
+        AXM_DTYPE_LIST
+        #undef X
+        default: break;
+    }
+
+    std::cerr << "Cannot assign initializer_list of type '" + std::string(typeid(T).name()) + "' to Tensor with dtype '" + dtype_to_string(dtype) + "'";
+    ABORT_DEBUG()
+
+    return *this;
+}
+#define X(DTYPE, TYPE) template AXM_API Tensor& Tensor::operator=<TYPE>(std::initializer_list<TYPE>);
+AXM_DTYPE_LIST
+#undef X
+
 std::ostream& operator<<(std::ostream& os, const axm::Tensor& tensor) {
     std::ostringstream buffer;
     size_t* ids = new size_t[tensor.ndim];
@@ -165,15 +229,9 @@ std::ostream& operator<<(std::ostream& os, const axm::Tensor& tensor) {
 
         size_t idx = std::inner_product(ids, ids + tensor.ndim, tensor.strides, 0);
         switch (tensor.dtype) {
-            case FP32:   buffer << static_cast<float*>(tensor.data)[idx]; break;
-            case FP64:   buffer << static_cast<double*>(tensor.data)[idx]; break;
-            case FP16:   buffer << "UNK"; break;
-            case BF16:   buffer << "UNK"; break;
-            case BOOL:   buffer << static_cast<bool*>(tensor.data)[idx]; break;
-            case INT8:   buffer << static_cast<int8_t*>(tensor.data)[idx]; break;
-            case INT32:  buffer << static_cast<int32_t*>(tensor.data)[idx]; break;
-            case UINT8:  buffer << static_cast<uint8_t*>(tensor.data)[idx]; break;
-            case UINT32: buffer << static_cast<uint32_t*>(tensor.data)[idx]; break;
+            #define X(DTYPE, TYPE) case DTYPE: buffer << reinterpret_cast<TYPE*>(tensor.data)[idx]; break;
+            AXM_DTYPE_LIST
+            #undef X
             default: buffer << "UNK"; std::cerr << "Unknown dtype\n";
         }
 
