@@ -18,8 +18,8 @@ public:
 
     Tensor();
     Tensor(std::initializer_list<size_t> dims_, Device device_ = CPU);
-    Tensor(TensorDescriptor& desc, Device device_ = CPU);
-    Tensor(Tensor<T>& tensor, bool copy = true);
+    Tensor(const TensorDescriptor& desc, Device device_ = CPU);
+    Tensor(const Tensor<T>& tensor, bool copy = true);
 
     ~Tensor();
 

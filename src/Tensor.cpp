@@ -20,29 +20,25 @@
     #define ALIGNED_FREE(ptr) free(ptr)
 #endif
 
-#define CUER(call)                                                                                 \
-do {                                                                                               \
-    cudaError_t err = call;                                                                        \
-    if (err != cudaSuccess) {                                                                      \
-        fprintf(stderr, "CUDA error at %s:%d: %s\n", __FILE__, __LINE__, cudaGetErrorString(err)); \
-        exit(EXIT_FAILURE);                                                                        \
-    }                                                                                              \
-} while(0)
-
 namespace axm {
 
 #define X(DTYPE, TYPE) template class Tensor<TYPE>;
 AXM_TYPE_LIST
 #undef X
 
+inline constexpr size_t ceil(size_t value, size_t step) {
+    return ((value + step - 1) / step) * step;
+}
+
 template<typename T>
 void Tensor<T>::alloc() {
+    size_t bytes = ceil(size * sizeof(T), ALIGNMENT);
     switch (device) {
         case CPU: 
-            data = ALIGNED_ALLOC(size * sizeof(T)); 
+            data = ALIGNED_ALLOC(bytes); 
             break;
         case CUDA: 
-            CUER(cudaMalloc((void**)&data, size * sizeof(T)));
+            CUER(cudaMalloc((void**)&data, bytes));
             break;
         default: 
             std::cerr << "Unknown device\n";
@@ -94,13 +90,13 @@ Tensor<T>::Tensor(std::initializer_list<size_t> dims_, Device device_)
 }
 
 template<typename T>
-Tensor<T>::Tensor(TensorDescriptor& desc, Device device_):
-TensorDescriptor(desc), managed(false) {
+Tensor<T>::Tensor(const TensorDescriptor& desc, Device device_):
+TensorDescriptor(desc), device(device_), managed(false) {
     alloc();
 }
 
 template<typename T>
-Tensor<T>::Tensor(Tensor<T>& tensor, bool copy): TensorDescriptor(tensor.descriptor()), device(tensor.device), managed(false) {
+Tensor<T>::Tensor(const Tensor<T>& tensor, bool copy): TensorDescriptor(tensor.descriptor()), device(tensor.device), managed(false) {
     if (copy) {
         alloc();
         cpy_data(tensor.data, size);

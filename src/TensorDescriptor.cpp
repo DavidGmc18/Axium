@@ -3,10 +3,6 @@
 #include <sstream>
 #include <iostream>
 
-inline constexpr size_t ceil(size_t value, size_t step) {
-    return ((value + step - 1) / step) * step;
-}
-
 namespace axm {
 
 TensorDescriptor::TensorDescriptor(): ndim(0), size(0), managed_desc(false) {
