@@ -33,7 +33,6 @@ const char* dtype_to_string(Dtype dtype) {
     }
 }
 
-// TODO do these work?
 std::ostream& operator<<(std::ostream& os, const half& h) {
     os << __half2float(h);
     return os;

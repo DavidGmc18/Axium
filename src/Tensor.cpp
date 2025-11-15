@@ -148,6 +148,7 @@ Tensor& Tensor::operator=(const Tensor* tensor) {
     return *this;
 }
 
+// TODO assumes padding only on last dim and defualt ordered dims/strides
 template<typename T>
 Tensor& Tensor::operator=(const std::initializer_list<T> list) {
     size_t list_bytes = list.size() * sizeof(T);
@@ -164,7 +165,6 @@ Tensor& Tensor::operator=(const std::initializer_list<T> list) {
     switch (dtype) {
         #define X(DTYPE, TYPE) case DTYPE:\
             if constexpr (std::is_same_v<TYPE, T>) {\
-                printf("SAME -> %s\n", dtype_to_string(DTYPE));\
                 for (size_t i = 0; i < outer; ++i) {\
                     memcpy(dst, src, inner);\
                     dst += stride;\
@@ -185,7 +185,6 @@ Tensor& Tensor::operator=(const std::initializer_list<T> list) {
     switch (dtype) {
         #define X(DTYPE, TYPE) case DTYPE:\
             if constexpr (std::is_convertible_v<T, TYPE>) {\
-                printf("CONVERT -> %s\n", dtype_to_string(DTYPE));\
                 for (size_t i = 0; i < outer; ++i) {\
                     for (size_t j = 0; j < inner; ++j) {\
                         reinterpret_cast<TYPE*>(dst)[j] = static_cast<TYPE>(src[j * sizeof(T)]);\
@@ -227,7 +226,7 @@ std::ostream& operator<<(std::ostream& os, const axm::Tensor& tensor) {
             depth++;
         }
 
-        size_t idx = std::inner_product(ids, ids + tensor.ndim, tensor.strides, 0);
+        size_t idx = std::inner_product(ids, ids + tensor.ndim, tensor.strides, size_t(0));
         switch (tensor.dtype) {
             #define X(DTYPE, TYPE) case DTYPE: buffer << reinterpret_cast<TYPE*>(tensor.data)[idx]; break;
             AXM_DTYPE_LIST

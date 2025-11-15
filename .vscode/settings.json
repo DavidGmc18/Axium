@@ -1,0 +1,13 @@
+{
+    "terminal.integrated.profiles.windows": {
+        "x64 MSVC (PowerShell)": {
+            "path": "powershell.exe",
+            "args": [
+                "-NoExit",
+                "-Command",
+                "& { cmd /c '\"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat\" x64 && set' | ForEach-Object { $name, $value = $_ -split '=', 2; if ($name -and $value) { Set-Item -Path \"Env:$name\" -Value $value } } }"
+            ]
+        }
+    },
+    "terminal.integrated.defaultProfile.windows": "x64 MSVC (PowerShell)"
+}

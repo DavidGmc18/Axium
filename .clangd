@@ -9,3 +9,4 @@ CompileFlags:
     - -IC:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\include
 
     - -I../include
+    - -I../../include

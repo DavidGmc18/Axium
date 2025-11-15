@@ -18,7 +18,7 @@ public:
     Tensor();
     Tensor(std::initializer_list<size_t> dims_, Dtype dtype_ = FP32, Device device_ = CPU);
     Tensor(TensorDescriptor& desc, Device device_ = CPU);
-    Tensor(Tensor& tensor, bool copy = false);
+    Tensor(Tensor& tensor, bool copy = true);
 
     ~Tensor();
 

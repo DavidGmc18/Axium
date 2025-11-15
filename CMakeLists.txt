@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.22)
 
+set(CMAKE_C_COMPILER clang-cl)
+set(CMAKE_CXX_COMPILER clang-cl)
+
 project(Axium LANGUAGES C CXX CUDA)
+
+set(CMAKE_CUDA_HOST_COMPILER "cl.exe")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CUDA_STANDARD 17)
@@ -22,13 +27,13 @@ add_library(Axium SHARED ${SRC_FILES})
 
 if(MSVC)
     target_compile_options(Axium PRIVATE
-        $<$<CONFIG:Release>:/O2 /Ot /Ob2 /Oi /fp:fast /arch:AVX2>
-        $<$<CONFIG:Debug>:/fp:fast /arch:AVX2>
+        $<$<CONFIG:Debug>:/O1 /Ob0 /Z7 /Oi /RTC1 /fp:precise /arch:AVX2>
+        $<$<CONFIG:Release>:/O2 /Ob2 /Oi /MDd /DNDEBUG /fp:fast /arch:AVX2>
     )
 else()
     target_compile_options(Axium PRIVATE
-        $<$<CONFIG:Release>:-O3 -Ofast -march=native -ffast-math -funroll-loops>
         $<$<CONFIG:Debug>:-O1 -g>
+        $<$<CONFIG:Release>:-O3 -Ofast -march=native -ffast-math -funroll-loops>
     )
 endif()
 
