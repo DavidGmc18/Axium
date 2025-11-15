@@ -4,38 +4,42 @@
 #include "TensorDescriptor.hpp"
 
 namespace axm {
-    
+
+template<typename T>
 struct AXM_API Tensor : TensorDescriptor {
 protected:
     bool managed;
     void alloc();
     void dealloc();
-    void copy_data(void* src);
+    void cpy_data(const T* src, size_t n);
 public:
-    void* data;
+    T* data;
     Device device;
 
     Tensor();
-    Tensor(std::initializer_list<size_t> dims_, Dtype dtype_ = FP32, Device device_ = CPU);
+    Tensor(std::initializer_list<size_t> dims_, Device device_ = CPU);
     Tensor(TensorDescriptor& desc, Device device_ = CPU);
-    Tensor(Tensor& tensor, bool copy = true);
+    Tensor(Tensor<T>& tensor, bool copy = true);
 
     ~Tensor();
 
+    const TensorDescriptor& descriptor() const;
+
     void toCuda();
     void fromCuda();
-
-    const TensorDescriptor& descriptor() const;
    
     const bool get_managed() const;
 
     Tensor& operator=(const Tensor& tensor);
     Tensor& operator=(const Tensor* tensor);
     
-    template<typename T>
-    Tensor& operator=(const std::initializer_list<T> list);
+    Tensor<T>& operator=(const std::initializer_list<T> list);
 
-    friend AXM_API std::ostream& operator<<(std::ostream& os, const Tensor& t);
+    template<typename U>
+    friend std::ostream& operator<<(std::ostream&, const Tensor<U>&);
 };
+
+template<typename T>
+std::ostream& operator<<(std::ostream& os, const Tensor<T>& t);
 
 }

@@ -1,5 +1,5 @@
 #include "AXM/Tensor.hpp"
-#include "AXM/Data.hpp"
+#include "AXM/types.hpp"
 #include "util.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -9,12 +9,14 @@
 #include <numeric>
 #include <sstream>
 
+#define ALIGNMENT 32
+
 #ifdef _MSC_VER
     #include <malloc.h>
-    #define ALIGNED_ALLOC(align, size) _aligned_malloc(size, align)
+    #define ALIGNED_ALLOC(size) (T*)_aligned_malloc(size, ALIGNMENT)
     #define ALIGNED_FREE(ptr) _aligned_free(ptr)
 #else
-    #define ALIGNED_ALLOC(align, size) aligned_alloc(align, size)
+    #define ALIGNED_ALLOC(size) (T*)aligned_alloc(ALIGNMENT, size)
     #define ALIGNED_FREE(ptr) free(ptr)
 #endif
 
@@ -29,13 +31,18 @@ do {                                                                            
 
 namespace axm {
 
-void Tensor::alloc() {
+#define X(DTYPE, TYPE) template class Tensor<TYPE>;
+AXM_TYPE_LIST
+#undef X
+
+template<typename T>
+void Tensor<T>::alloc() {
     switch (device) {
         case CPU: 
-            data = ALIGNED_ALLOC(ALIGNMENT, bytes); 
+            data = ALIGNED_ALLOC(size * sizeof(T)); 
             break;
         case CUDA: 
-            CUER(cudaMalloc((void**)&data, bytes));
+            CUER(cudaMalloc((void**)&data, size * sizeof(T)));
             break;
         default: 
             std::cerr << "Unknown device\n";
@@ -45,7 +52,8 @@ void Tensor::alloc() {
     managed = true;
 }
 
-void Tensor::dealloc() {
+template<typename T>
+void Tensor<T>::dealloc() {
     if (managed) {
         switch (device) {
             case CPU: ALIGNED_FREE(data); break;
@@ -55,16 +63,19 @@ void Tensor::dealloc() {
                 ABORT_DEBUG()
         }
     }
+    data = nullptr;
     managed = false;
 }
 
-void Tensor::copy_data(void* src) {
-    switch (device) {
+template<typename T>
+void Tensor<T>::cpy_data(const T* src, size_t n) {
+    size_t bytes = (n < size ? n : size) * sizeof(T);
+    switch(device) {
         case CPU: 
             memcpy(data, src, bytes);
             break;
         case CUDA: 
-            CUER(cudaMemcpy(data, src, bytes, cudaMemcpyDeviceToDevice));
+            CUER(cudaMemcpy(data, src, bytes, cudaMemcpyDefault));
             break;
         default:
             std::cerr << "Unknown device\n";
@@ -72,61 +83,71 @@ void Tensor::copy_data(void* src) {
     }
 }
 
-Tensor::Tensor(): TensorDescriptor(), managed(false) {
+template<typename T>
+Tensor<T>::Tensor(): TensorDescriptor(), managed(false) {
 }
 
-Tensor::Tensor(std::initializer_list<size_t> dims_, Dtype dtype_, Device device_)
-: TensorDescriptor(dims_, dtype_), device(device_), managed(false) {
+template<typename T>
+Tensor<T>::Tensor(std::initializer_list<size_t> dims_, Device device_)
+: TensorDescriptor(dims_), device(device_), managed(false) {
     alloc();
 }
 
-Tensor::Tensor(TensorDescriptor& desc, Device device_):
+template<typename T>
+Tensor<T>::Tensor(TensorDescriptor& desc, Device device_):
 TensorDescriptor(desc), managed(false) {
     alloc();
 }
 
-Tensor::Tensor(Tensor& tensor, bool copy): TensorDescriptor(tensor.descriptor()), device(tensor.device), managed(false) {
+template<typename T>
+Tensor<T>::Tensor(Tensor<T>& tensor, bool copy): TensorDescriptor(tensor.descriptor()), device(tensor.device), managed(false) {
     if (copy) {
         alloc();
-        copy_data(tensor.data);
+        cpy_data(tensor.data, size);
     } else {
         data = tensor.data;
     }
 }
 
-Tensor::~Tensor() {
+template<typename T>
+Tensor<T>::~Tensor() {
     dealloc();
 }
 
-void Tensor::toCuda() {
-    void* new_data;
+template<typename T>
+const TensorDescriptor& Tensor<T>::descriptor() const {
+    return *this;
+}
 
-    CUER(cudaMalloc((void**)&new_data, bytes));
-    CUER(cudaMemcpy(new_data, data, bytes, cudaMemcpyHostToDevice));
+template<typename T>
+void Tensor<T>::toCuda() {
+    T* new_data;
+
+    CUER(cudaMalloc((void**)&new_data, size * sizeof(T)));
+    CUER(cudaMemcpy(new_data, data, size * sizeof(T), cudaMemcpyHostToDevice));
     ALIGNED_FREE(data);
 
     data = new_data;
     device = CUDA;
 }
 
-void Tensor::fromCuda() {
-    void* new_data = ALIGNED_ALLOC(32, bytes);
-    CUER(cudaMemcpy(new_data, data, bytes, cudaMemcpyDeviceToHost));
+template<typename T>
+void Tensor<T>::fromCuda() {
+    T* new_data = ALIGNED_ALLOC(size * sizeof(T));
+    CUER(cudaMemcpy(new_data, data, size * sizeof(T), cudaMemcpyDeviceToHost));
     CUER(cudaFree(data));
 
     data = new_data;
     device = CPU;
 }
 
-const TensorDescriptor& Tensor::descriptor() const {
-    return *this;
-}
-
-const bool Tensor::get_managed() const {
+template<typename T>
+const bool Tensor<T>::get_managed() const {
     return managed;
 }
 
-Tensor& Tensor::operator=(const Tensor& tensor) {
+template<typename T>
+Tensor<T>& Tensor<T>::operator=(const Tensor<T>& tensor) {
     if (this->descriptor() != tensor.descriptor()) {
         dealloc();
         set_descriptor(tensor);
@@ -134,85 +155,30 @@ Tensor& Tensor::operator=(const Tensor& tensor) {
         alloc();
     }
     if (this->data == tensor.data) return *this;
-    copy_data(tensor.data);
+    cpy_data(tensor.data, tensor.size);
     return *this;
 }
 
-Tensor& Tensor::operator=(const Tensor* tensor) {
+template<typename T>
+Tensor<T>& Tensor<T>::operator=(const Tensor<T>* tensor) {
     if (this->descriptor() != tensor->descriptor()) {
         std::cerr << "Assignment failed for shallow copy: the descriptors of source and destination tensors do not match\n";
         ABORT_DEBUG()
         return *this;
     }
+    dealloc();
     data = tensor->data;
     return *this;
 }
 
-// TODO assumes padding only on last dim and defualt ordered dims/strides
 template<typename T>
-Tensor& Tensor::operator=(const std::initializer_list<T> list) {
-    size_t list_bytes = list.size() * sizeof(T);
-    if (list_bytes > bytes) list_bytes = bytes;
-
-    size_t inner = dims[ndim - 1] * size_of_dtype(dtype);
-    size_t outer = list.size() / dims[ndim - 1];
-    size_t stride = strides[ndim - 2] * size_of_dtype(dtype);
-    size_t remainder = list_bytes % inner;
-
-    const char* src = reinterpret_cast<const char*>(list.begin());
-    char* dst = (char*)data;
-
-    switch (dtype) {
-        #define X(DTYPE, TYPE) case DTYPE:\
-            if constexpr (std::is_same_v<TYPE, T>) {\
-                for (size_t i = 0; i < outer; ++i) {\
-                    memcpy(dst, src, inner);\
-                    dst += stride;\
-                    src += inner;\
-                }\
-                if (remainder) memcpy(dst, src, remainder);\
-                return *this;\
-            }\
-            break;
-        AXM_DTYPE_LIST
-        #undef X
-        default: break;
-    }
-
-    inner /= size_of_dtype(dtype);
-    remainder /= size_of_dtype(dtype);
-    size_t stride_src = inner * sizeof(T);
-    switch (dtype) {
-        #define X(DTYPE, TYPE) case DTYPE:\
-            if constexpr (std::is_convertible_v<T, TYPE>) {\
-                for (size_t i = 0; i < outer; ++i) {\
-                    for (size_t j = 0; j < inner; ++j) {\
-                        reinterpret_cast<TYPE*>(dst)[j] = static_cast<TYPE>(src[j * sizeof(T)]);\
-                    }\
-                    dst += stride;\
-                    src += stride_src;\
-                }\
-                if (remainder)\
-                    for (size_t j = 0; j < remainder; ++j) {\
-                        reinterpret_cast<TYPE*>(dst)[j] = static_cast<TYPE>(src[j * sizeof(T)]);\
-                    }\
-                return *this;\
-            }
-        AXM_DTYPE_LIST
-        #undef X
-        default: break;
-    }
-
-    std::cerr << "Cannot assign initializer_list of type '" + std::string(typeid(T).name()) + "' to Tensor with dtype '" + dtype_to_string(dtype) + "'";
-    ABORT_DEBUG()
-
+Tensor<T>& Tensor<T>::operator=(const std::initializer_list<T> list) {
+    cpy_data(list.begin(), list.size());
     return *this;
 }
-#define X(DTYPE, TYPE) template AXM_API Tensor& Tensor::operator=<TYPE>(std::initializer_list<TYPE>);
-AXM_DTYPE_LIST
-#undef X
 
-std::ostream& operator<<(std::ostream& os, const axm::Tensor& tensor) {
+template<typename T>
+std::ostream& operator<<(std::ostream& os, const Tensor<T>& tensor) {
     std::ostringstream buffer;
     size_t* ids = new size_t[tensor.ndim];
     memset(ids, 0, tensor.ndim * sizeof(size_t));
@@ -227,12 +193,7 @@ std::ostream& operator<<(std::ostream& os, const axm::Tensor& tensor) {
         }
 
         size_t idx = std::inner_product(ids, ids + tensor.ndim, tensor.strides, size_t(0));
-        switch (tensor.dtype) {
-            #define X(DTYPE, TYPE) case DTYPE: buffer << reinterpret_cast<TYPE*>(tensor.data)[idx]; break;
-            AXM_DTYPE_LIST
-            #undef X
-            default: buffer << "UNK"; std::cerr << "Unknown dtype\n";
-        }
+        buffer << tensor.data[idx];
 
         for (size_t dim = tensor.ndim; dim-- > 0;) {
             if (dim + 1 != tensor.ndim) {
@@ -256,5 +217,8 @@ std::ostream& operator<<(std::ostream& os, const axm::Tensor& tensor) {
 
     return os << buffer.str();
 }
+#define X(DTYPE, TYPE) template AXM_API std::ostream& operator<<(std::ostream&, const Tensor<TYPE>&);
+AXM_TYPE_LIST
+#undef X
 
 }
