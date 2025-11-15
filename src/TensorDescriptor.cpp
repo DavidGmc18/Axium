@@ -1,4 +1,3 @@
-#include "AXM/Data.hpp"
 #include "AXM/TensorDescriptor.hpp"
 #include "util.hpp"
 #include <sstream>
@@ -10,7 +9,7 @@ inline constexpr size_t ceil(size_t value, size_t step) {
 
 namespace axm {
 
-TensorDescriptor::TensorDescriptor(): ndim(0), dtype(NONE), size(0), bytes(0), managed_desc(false) {
+TensorDescriptor::TensorDescriptor(): ndim(0), size(0), managed_desc(false) {
 }
 
 TensorDescriptor::TensorDescriptor(size_t ndim_): ndim(ndim_), managed_desc(true) {
@@ -18,38 +17,27 @@ TensorDescriptor::TensorDescriptor(size_t ndim_): ndim(ndim_), managed_desc(true
     strides = (size_t*)malloc(sizeof(size_t) * ndim);
 }
 
-TensorDescriptor::TensorDescriptor(std::initializer_list<size_t> dims_, Dtype dtype_): TensorDescriptor(dims_.size()) {
-    dtype = dtype_;
+TensorDescriptor::TensorDescriptor(std::initializer_list<size_t> dims_): TensorDescriptor(dims_.size()) {
     size = ndim ? 1 : 0;
-    bytes = size;
 
     size_t idx = 0;
     for (size_t d : dims_) dims[idx++] = d;
 
     for (size_t i = ndim; i-- > 0;) {
-        strides[i] = bytes;
+        strides[i] = size;
         size *= dims[i];
-        if (i + 1 == ndim) {
-            bytes *= ceil(dims[i] * size_of_dtype(dtype), ALIGNMENT) / size_of_dtype(dtype);
-        } else {
-            bytes *= dims[i];
-        }
     }
-
-    bytes *= size_of_dtype(dtype);
 }
 
 TensorDescriptor::TensorDescriptor(const TensorDescriptor& desc): TensorDescriptor(desc.ndim) {
-    dtype = desc.dtype;
     size = desc.size;
-    bytes = desc.bytes;
 
     memcpy(dims, desc.dims, sizeof(size_t) * ndim);
     memcpy(strides, desc.strides, sizeof(size_t) * ndim);
 }
 
 TensorDescriptor::TensorDescriptor(const TensorDescriptor* desc):
-ndim(desc->ndim), dtype(desc->dtype), size(desc->size), bytes(desc->bytes), managed_desc(false) {
+ndim(desc->ndim), size(desc->size), managed_desc(false) {
     dims = desc->dims;
     strides = desc->strides;
 }
@@ -57,7 +45,9 @@ ndim(desc->ndim), dtype(desc->dtype), size(desc->size), bytes(desc->bytes), mana
 TensorDescriptor::~TensorDescriptor() {
     if (managed_desc && ndim > 0) {
         free(dims);
+        dims = nullptr;
         free(strides);
+        strides = nullptr;
     }
 }
 
@@ -65,9 +55,7 @@ void TensorDescriptor::set_descriptor(const TensorDescriptor& desc) {
     if (*this == desc) return;
 
     ndim = desc.ndim;
-    dtype = desc.dtype;
-    size = desc.size;
-    bytes = desc.bytes;
+    size = desc.size;;
 
     if (!managed_desc) {
         dims = (size_t*)malloc(sizeof(size_t) * ndim);
@@ -84,7 +72,7 @@ void TensorDescriptor::set_descriptor(const TensorDescriptor& desc) {
 }
 
 bool TensorDescriptor::operator==(const TensorDescriptor& desc) const {
-    if (ndim != desc.ndim || dtype != desc.dtype || size != desc.size || bytes != desc.bytes) return false;
+    if (ndim != desc.ndim || size != desc.size) return false;
     return std::equal(dims, dims + ndim, desc.dims) && std::equal(strides, strides + ndim, desc.strides);
 }
 
@@ -94,7 +82,7 @@ bool TensorDescriptor::operator!=(const TensorDescriptor& desc) const {
 
 std::ostream& operator<<(std::ostream& os, const axm::TensorDescriptor& descriptor) {
     std::ostringstream buffer;
-    buffer << "(";
+    buffer << "TensorDescriptor(";
     buffer << "ndim=" << descriptor.ndim << ", ";
 
     buffer << "dims={";
@@ -111,9 +99,7 @@ std::ostream& operator<<(std::ostream& os, const axm::TensorDescriptor& descript
     }
     buffer << "}, ";
 
-    buffer << "dtype=" << dtype_to_string(descriptor.dtype) << ", ";
-    buffer << "size=" << descriptor.size << ", ";
-    buffer << "bytes=" << descriptor.bytes;
+    buffer << "size=" << descriptor.size;
     buffer << ")";
     return os << buffer.str();
 }

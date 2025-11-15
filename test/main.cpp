@@ -1,6 +1,7 @@
 #include "AXM/Tensor.hpp"
 #include "AXM/operations.hpp"
 #include <chrono>
+#include <iostream>
 
 // int main() {
 //     const size_t N = 960;
@@ -31,11 +32,11 @@
 
 int main() {
     const size_t M = 6, N = 16, K = 2;
-    axm::Tensor a({M, K});
-    axm::Tensor b({K, N});
+    axm::Tensor<float> a({M, K});
+    axm::Tensor<float> b({K, N});
 
-    axm::Tensor c({M, N});
-    axm::Tensor d({M, N});
+    axm::Tensor<float> c({M, N});
+    axm::Tensor<float> d({M, N});
 
     a = {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
