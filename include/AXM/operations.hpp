@@ -3,13 +3,6 @@
 #include "api.hpp"
 
 namespace axm::op {
-    template<typename T>
-    AXM_API void add(const T* A, const T* B, T* C, size_t n);
-
-    template<typename T>
-    AXM_API void sub(const T* A, const T* B, T* C, size_t n);
-
-
     AXM_API void sgemm_naive(
         size_t M, size_t N, size_t K,
         float& alpha,

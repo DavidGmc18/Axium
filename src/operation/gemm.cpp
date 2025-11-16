@@ -1,10 +1,11 @@
 #include "AXM/operations.hpp"
 #include <immintrin.h>
 #include <cstring>
+#include <cstdio>
 
-#define CM 48
-#define CN 48
-#define CK 48
+#define CM 192
+#define CN 192
+#define CK 192
 
 namespace axm::op {
 
@@ -25,59 +26,6 @@ void sgemm_naive(
                 acc += a * b;
             }
             C[m * ldc + n] = alpha * acc + beta * C[m * ldc + n];
-        }  
-    }
-}
-
-__forceinline void kernel_6x16(size_t m, size_t n, size_t k, const float* A, size_t lda, const float* B, size_t ldb, __m256 (&acc)[6][2]) {
-    __m256 b0 = _mm256_load_ps(B + k * ldb + n);
-    __m256 b1 = _mm256_load_ps(B + k * ldb + n + 8);
-
-    #pragma unroll
-    for (int km = 0; km < 6; ++km) {
-        __m256 a = _mm256_set1_ps(A[(m + km) * lda + k]);
-        acc[km][0] = _mm256_fmadd_ps(a, b0, acc[km][0]);
-        acc[km][1] = _mm256_fmadd_ps(a, b1, acc[km][1]);
-    }
-}
-
-__forceinline void store_6x16(size_t m, size_t n, float& alpha, float& beta, float* C, size_t ldc, __m256 (&acc)[6][2]) {
-    __m256 a = _mm256_set1_ps(alpha);
-    __m256 b = _mm256_set1_ps(beta);
-
-    #pragma unroll
-    for (size_t km = 0; km < 6; ++km) {
-        acc[km][0] = _mm256_mul_ps(acc[km][0], a);
-        acc[km][1] = _mm256_mul_ps(acc[km][1], a);
-
-        __m256 d[] = {
-            _mm256_load_ps(C + (m + km) * ldc + n),
-            _mm256_load_ps(C + (m + km) * ldc + n + 8)
-        };
-
-        acc[km][0] = _mm256_fmadd_ps(b, d[0], acc[km][0]);
-        acc[km][1] = _mm256_fmadd_ps(b, d[1], acc[km][1]);
-
-        _mm256_store_ps(C + (m + km) * ldc + n, acc[km][0]);
-        _mm256_store_ps(C + (m + km) * ldc + n + 8, acc[km][1]);
-    }
-}
-
-void sgemm_6x16(
-    size_t M, size_t N, size_t K,
-    float& alpha,
-    const float* A, size_t lda, bool trana,
-    const float* B, size_t ldb, bool tranb,
-    float& beta,
-    float* C, size_t ldc
-) {
-    for (size_t m = 0; m < M; m += 6) {
-        for (size_t n = 0; n < N; n += 16) {
-            __m256 acc[6][2] = {};
-            for (size_t k = 0; k < K; ++k) {
-                kernel_6x16(m, n, k, A, lda, B, ldb, acc);
-            }
-            store_6x16(m, n, alpha, beta, C, ldc, acc);
         }  
     }
 }
@@ -138,14 +86,6 @@ __forceinline void load_Bt(float tile[CK][CN], const float* B, size_t ldb, size_
     }
 }
 
-// __forceinline void load_acc(__m256 (&acc)[6][2], float* C, size_t ldc, size_t m, size_t n) {
-//     #pragma unroll
-//     for (int mm = 0; mm < 6; ++mm) {
-//         acc[mm][0] = _mm256_load_ps(C + (m + mm) * ldc + n);
-//         acc[mm][1] = _mm256_load_ps(C + (m + mm) * ldc + n + 8);
-//     }
-// }
-
 __forceinline void kernel_6x16(size_t m, size_t n, size_t k, const float At[CM][CK], const float Bt[CK][CN], __m256 (&acc)[6][2]) {
     __m256 b0 = _mm256_load_ps(&Bt[k][n]);
     __m256 b1 = _mm256_load_ps(&Bt[k][n + 8]);
@@ -158,8 +98,9 @@ __forceinline void kernel_6x16(size_t m, size_t n, size_t k, const float At[CM][
     }
 }
 
-__forceinline void store_6x16(__m256 (&acc)[6][2], float* C, size_t ldc, size_t alpha, size_t m, size_t n) {
+__forceinline void store_6x16(__m256 (&acc)[6][2], float* C, size_t ldc, float alpha, float beta, size_t m, size_t n) {
     __m256 a = _mm256_set1_ps(alpha);
+    __m256 b = _mm256_set1_ps(beta);
 
     #pragma unroll
     for (size_t mm = 0; mm < 6; ++mm) {
@@ -171,8 +112,8 @@ __forceinline void store_6x16(__m256 (&acc)[6][2], float* C, size_t ldc, size_t 
             _mm256_load_ps(C + (m + mm) * ldc + n + 8)
         };
 
-        acc[mm][0] = _mm256_add_ps(acc[mm][0], c[0]);
-        acc[mm][1] = _mm256_add_ps(acc[mm][1], c[1]);
+        acc[mm][0] = _mm256_fmadd_ps(b, c[0], acc[mm][0]);
+        acc[mm][1] = _mm256_fmadd_ps(b, c[1], acc[mm][1]);
 
         _mm256_store_ps(C + (m + mm) * ldc + n, acc[mm][0]);
         _mm256_store_ps(C + (m + mm) * ldc + n + 8, acc[mm][1]);
@@ -194,13 +135,15 @@ __forceinline void kernel_tile(
     load_At(At, A, lda, m, k, M, K);
     load_Bt(Bt, B, ldb, k, n, K, N);
 
+    #pragma unroll
     for (size_t mm = 0; mm < CM; mm += 6) {
+        #pragma unroll
         for (size_t nn = 0; nn < CN; nn += 16) {
             __m256 acc[6][2] = {};
             for (size_t kk = 0; kk < CK; ++kk) {
                 kernel_6x16(mm, nn, kk, At, Bt, acc);
             }
-            store_6x16(acc, C, ldc, alpha, m + mm, n + nn);
+            store_6x16(acc, C, ldc, alpha, (k==0 ? beta : 1.0f), m + mm, n + nn);
         }  
     }
 }
