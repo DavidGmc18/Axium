@@ -10,27 +10,44 @@
 
 namespace axm::op {
 
-__forceinline void load_At(float tile[CM][CK], const float* A, size_t lda, size_t m, size_t k, size_t M, size_t K) {
+// TODO slow tile copying with tran option
+__forceinline void load_At(float tile[CM][CK], const float* A, size_t lda, bool trana, size_t m, size_t k, size_t M, size_t K) {
     size_t col = std::min(size_t(CK), K - k);
     size_t rows = std::min(size_t(CM), M - m);
-    for (size_t mm = 0; mm < rows; ++mm) {
-        for (size_t kk = 0; kk < col; ++kk) {
-            tile[mm][kk] = A[(m + mm)*lda + k + kk];
+    if (!trana) {
+        for (size_t mm = 0; mm < rows; ++mm) {
+            for (size_t kk = 0; kk < col; ++kk) {
+                tile[mm][kk] = A[(m + mm)*lda + (k + kk)];
+            }
         }
+    } else {
+       for (size_t mm = 0; mm < rows; ++mm) {
+            for (size_t kk = 0; kk < col; ++kk) {
+                tile[mm][kk] = A[(k + kk)*lda + (m + mm)];
+            }
+        } 
     }
 } 
 
-__forceinline void load_Bt(float tile[CK][CN], const float* B, size_t ldb, size_t k, size_t n, size_t K, size_t N) {
+__forceinline void load_Bt(float tile[CK][CN], const float* B, size_t ldb, bool tranb, size_t k, size_t n, size_t K, size_t N) {
     size_t col = std::min(size_t(CN), N - n);
     size_t rows = std::min(size_t(CK), K - k);
-    for (size_t kk = 0; kk < rows; ++kk) {
-        for (size_t nn = 0; nn < col; ++nn) {
-            tile[kk][nn] = B[(k + kk)*ldb + n + nn];
+    if (!tranb) {
+        for (size_t kk = 0; kk < rows; ++kk) {
+            for (size_t nn = 0; nn < col; ++nn) {
+                tile[kk][nn] = B[(k + kk)*ldb + (n + nn)];
+            }
+        }
+    } else {
+        for (size_t kk = 0; kk < rows; ++kk) {
+            for (size_t nn = 0; nn < col; ++nn) {
+                tile[kk][nn] = B[(n + nn)*ldb + (k + kk)];
+            }
         }
     }
 }
 
-__forceinline void kernel_6x16(size_t mm, size_t nn, size_t kk, const float At[CM][CK], const float Bt[CK][CN], __m256 (&acc)[6][2]) {
+__forceinline void kernel_6x16(size_t mm, size_t nn, size_t kk, const float At[CM][CK], const float Bt[CK][CN], __m256 acc[6][2]) {
     __m256 b0 = _mm256_load_ps(&Bt[kk][nn]);
     __m256 b1 = _mm256_load_ps(&Bt[kk][nn + 8]);
 
@@ -79,12 +96,11 @@ __forceinline void kernel_tile(
     const float& beta,
     float* C, size_t ldc
 ) {
-    // TODO needs zeroing out with not nice K dim, optimize
     alignas(32) float At[CM][CK] = {};
     alignas(32) float Bt[CK][CN] = {};
 
-    load_At(At, A, lda, m, k, M, K);
-    load_Bt(Bt, B, ldb, k, n, K, N);
+    load_At(At, A, lda, trana, m, k, M, K);
+    load_Bt(Bt, B, ldb, tranb, k, n, K, N);
 
     #pragma unroll
     for (size_t mm = 0; mm < CM; mm += 6) {
@@ -99,8 +115,6 @@ __forceinline void kernel_tile(
     }
 }
 
-// TODO no beta so far
-// TOOD no transpose
 void sgemm(
     size_t M, size_t N, size_t K,
     const float& alpha,
