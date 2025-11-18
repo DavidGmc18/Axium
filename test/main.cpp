@@ -4,7 +4,7 @@
 #include <random>
 
 int main() {
-    const size_t M = 768, N = 768, K = 768;
+    const size_t M = 961, N = 961, K = 961;
     axm::Tensor<float> a({M, K});
     axm::Tensor<float> b({K, N});
     axm::Tensor<float> c({M, N});

@@ -102,10 +102,10 @@ __forceinline void kernel_tile(
     load_At(At, A, lda, trana, m, k, M, K);
     load_Bt(Bt, B, ldb, tranb, k, n, K, N);
 
-    #pragma unroll
-    for (size_t mm = 0; mm < CM; mm += 6) {
-        #pragma unroll
-        for (size_t nn = 0; nn < CN; nn += 16) {
+    const size_t rows = std::min(size_t(CM), M - m);
+    for (size_t mm = 0; mm < rows; mm += 6) {
+        const size_t cols = std::min(size_t(CN), N - n);
+        for (size_t nn = 0; nn < cols; nn += 16) {
             __m256 acc[6][2] = {};
             for (size_t kk = 0; kk < CK; ++kk) {
                 kernel_6x16(mm, nn, kk, At, Bt, acc);
