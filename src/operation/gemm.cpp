@@ -94,13 +94,14 @@ __forceinline void kernel_tile(
     const float* A, size_t lda, bool trana,
     const float* B, size_t ldb, bool tranb,
     const float& beta,
-    float* C, size_t ldc
+    float* C, size_t ldc,
+    float At[CM][CK], float Bt[CK][CN]
 ) {
-    alignas(32) float At[CM][CK] = {};
-    alignas(32) float Bt[CK][CN] = {};
+    // alignas(32) float At[CM][CK] = {};
+    // alignas(32) float Bt[CK][CN] = {};
 
-    load_At(At, A, lda, trana, m, k, M, K);
-    load_Bt(Bt, B, ldb, tranb, k, n, K, N);
+    // load_At(At, A, lda, trana, m, k, M, K);
+    // load_Bt(Bt, B, ldb, tranb, k, n, K, N);
 
     const size_t rows = std::min(size_t(CM), M - m);
     for (size_t mm = 0; mm < rows; mm += 6) {
@@ -124,8 +125,13 @@ void sgemm(
     float* C, size_t ldc
 ) {
     for (size_t m = 0; m < M; m += CM) {
-        for (size_t n = 0; n < N; n += CN) {
-            for (size_t k = 0; k < K; k += CK) {
+        for (size_t k = 0; k < K; k += CK) {
+            alignas(32) float At[CM][CK] = {};
+            load_At(At, A, lda, trana, m, k, M, K);
+            for (size_t n = 0; n < N; n += CN) {
+                alignas(32) float Bt[CK][CN] = {};
+                load_Bt(Bt, B, ldb, tranb, k, n, K, N);
+
                 kernel_tile(
                     M, N, K,
                     m, n, k,
@@ -133,27 +139,12 @@ void sgemm(
                     A, lda, trana,
                     B, ldb, tranb,
                     beta,
-                    C, ldc
+                    C, ldc,
+                    At, Bt
                 );
             }
         }
     } 
-
-    // for (size_t mn = 0; mn < (M/CM)*(N/CN); ++mn) {
-    //     size_t m = mn / (N/CN) * CM;
-    //     size_t n = mn % (N/CN) * CN;
-    //     for (size_t k = 0; k < K; k += CK) {
-    //         kernel_tile(
-    //             M, N, K,
-    //             m, n, k,
-    //             alpha,
-    //             A, lda, trana,
-    //             B, ldb, tranb,
-    //             beta,
-    //             C, ldc
-    //         );
-    //     }
-    // } 
 }
 
 }
