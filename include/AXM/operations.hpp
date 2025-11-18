@@ -12,6 +12,7 @@ namespace axm::op {
         float* C, size_t ldc
     );
 
+    template<const size_t CM, const size_t CN, const size_t CK>
     AXM_API void sgemm(
         size_t M, size_t N, size_t K,
         const float& alpha,

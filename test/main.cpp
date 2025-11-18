@@ -4,7 +4,8 @@
 #include <random>
 
 int main() {
-    const size_t M = 961, N = 961, K = 961;
+    const size_t S = 100;
+    const size_t M = S, N = S, K = S;
     axm::Tensor<float> a({M, K});
     axm::Tensor<float> b({K, N});
     axm::Tensor<float> c({M, N});
@@ -23,7 +24,7 @@ int main() {
     float alpha = 1.0f;
     float beta = 0.0f;
     auto start = std::chrono::high_resolution_clock::now();
-    axm::op::sgemm(
+    axm::op::sgemm<24, 32, 32>(
         M, N, K,
         alpha,
         a.data, a.strides[0], false,

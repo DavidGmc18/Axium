@@ -4,13 +4,10 @@
 #include <cstdio>
 #include <algorithm>
 
-#define CM 192
-#define CN 192
-#define CK 192
-
 namespace axm::op {
 
 // TODO slow tile copying with tran option
+template<const size_t CM, const size_t CK>
 __forceinline void load_At(float tile[CM][CK], const float* A, size_t lda, bool trana, size_t m, size_t k, size_t M, size_t K) {
     size_t col = std::min(size_t(CK), K - k);
     size_t rows = std::min(size_t(CM), M - m);
@@ -29,6 +26,7 @@ __forceinline void load_At(float tile[CM][CK], const float* A, size_t lda, bool 
     }
 } 
 
+template<const size_t CK, const size_t CN>
 __forceinline void load_Bt(float tile[CK][CN], const float* B, size_t ldb, bool tranb, size_t k, size_t n, size_t K, size_t N) {
     size_t col = std::min(size_t(CN), N - n);
     size_t rows = std::min(size_t(CK), K - k);
@@ -47,6 +45,7 @@ __forceinline void load_Bt(float tile[CK][CN], const float* B, size_t ldb, bool 
     }
 }
 
+template<const size_t CM, const size_t CN, const size_t CK>
 __forceinline void kernel_6x16(size_t mm, size_t nn, size_t kk, const float At[CM][CK], const float Bt[CK][CN], __m256 acc[6][2]) {
     __m256 b0 = _mm256_load_ps(&Bt[kk][nn]);
     __m256 b1 = _mm256_load_ps(&Bt[kk][nn + 8]);
@@ -87,6 +86,7 @@ __forceinline void store_6x16(__m256 (&acc)[6][2], float* C, size_t ldc, const f
     }
 }
 
+template<const size_t CM, const size_t CN, const size_t CK>
 __forceinline void kernel_tile(
     size_t M, size_t N, size_t K,
     size_t m, size_t n, size_t k,
@@ -97,25 +97,20 @@ __forceinline void kernel_tile(
     float* C, size_t ldc,
     float At[CM][CK], float Bt[CK][CN]
 ) {
-    // alignas(32) float At[CM][CK] = {};
-    // alignas(32) float Bt[CK][CN] = {};
-
-    // load_At(At, A, lda, trana, m, k, M, K);
-    // load_Bt(Bt, B, ldb, tranb, k, n, K, N);
-
     const size_t rows = std::min(size_t(CM), M - m);
     for (size_t mm = 0; mm < rows; mm += 6) {
         const size_t cols = std::min(size_t(CN), N - n);
         for (size_t nn = 0; nn < cols; nn += 16) {
             __m256 acc[6][2] = {};
             for (size_t kk = 0; kk < CK; ++kk) {
-                kernel_6x16(mm, nn, kk, At, Bt, acc);
+                kernel_6x16<CM, CN, CK>(mm, nn, kk, At, Bt, acc);
             }
             store_6x16(acc, C, ldc, alpha, (k==0 ? beta : 1.0f), m + mm, n + nn, M, N);
         }  
     }
 }
 
+template<const size_t CM, const size_t CN, const size_t CK>
 void sgemm(
     size_t M, size_t N, size_t K,
     const float& alpha,
@@ -127,12 +122,12 @@ void sgemm(
     for (size_t m = 0; m < M; m += CM) {
         for (size_t k = 0; k < K; k += CK) {
             alignas(32) float At[CM][CK] = {};
-            load_At(At, A, lda, trana, m, k, M, K);
+            load_At<CM, CK>(At, A, lda, trana, m, k, M, K);
             for (size_t n = 0; n < N; n += CN) {
                 alignas(32) float Bt[CK][CN] = {};
-                load_Bt(Bt, B, ldb, tranb, k, n, K, N);
+                load_Bt<CK, CN>(Bt, B, ldb, tranb, k, n, K, N);
 
-                kernel_tile(
+                kernel_tile<CM, CN, CK>(
                     M, N, K,
                     m, n, k,
                     alpha,
@@ -146,5 +141,10 @@ void sgemm(
         }
     } 
 }
-
+#define kernel(CM, CN, CK) template void sgemm<CM, CN, CK>(size_t,size_t,size_t,const float&,const float*,size_t,bool,const float*,size_t,bool,const float&,float*,size_t);
+// kernel(6, 16, 1) // No cache loop
+kernel(24, 32, 32)
+kernel(48, 48, 48)
+kernel(96, 96, 96)
+kernel(192, 192, 192)
 }
