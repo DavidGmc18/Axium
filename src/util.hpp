@@ -18,3 +18,15 @@ do {                                                                            
         exit(EXIT_FAILURE);                                                                        \
     }                                                                                              \
 } while(0)
+
+
+#ifdef __clang__
+#define CLANG_IGNORE_IGNORED_ATTRIBUTES_PUSH \
+    _Pragma("clang diagnostic push") \
+    _Pragma("clang diagnostic ignored \"-Wignored-attributes\"")
+#define CLANG_IGNORE_IGNORED_ATTRIBUTES_POP \
+    _Pragma("clang diagnostic pop")
+#else
+#define CLANG_IGNORE_IGNORED_ATTRIBUTES_PUSH
+#define CLANG_IGNORE_IGNORED_ATTRIBUTES_POP
+#endif

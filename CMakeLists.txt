@@ -5,7 +5,7 @@ set(CMAKE_CXX_COMPILER clang-cl)
 
 project(Axium LANGUAGES C CXX CUDA)
 
-set(CMAKE_CUDA_HOST_COMPILER "cl.exe")
+# set(CMAKE_CUDA_HOST_COMPILER "cl.exe")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CUDA_STANDARD 17)
@@ -27,15 +27,24 @@ add_library(Axium SHARED ${SRC_FILES})
 
 if(MSVC)
     target_compile_options(Axium PRIVATE
-        $<$<CONFIG:Debug>:/O1 /Ob0 /Z7 /Oi /RTC1 /fp:precise /arch:AVX2>
-        $<$<CONFIG:Release>:/O2 /Ob2 /Oi /MDd /DNDEBUG /fp:fast /arch:AVX2>
+        $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CXX>>:/O1 /Ob0 /Z7 /Oi /RTC1 /arch:AVX2>
+        $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:C>>:/O1 /Ob0 /Z7 /Oi /RTC1 /arch:AVX2>
+        $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:/O2 /Ob2 /Oi /MDd /DNDEBUG /fp:fast /arch:AVX2>
+        $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:C>>:/O2 /Ob2 /Oi /MDd /DNDEBUG /fp:fast /arch:AVX2>
     )
 else()
     target_compile_options(Axium PRIVATE
-        $<$<CONFIG:Debug>:-O1 -g>
-        $<$<CONFIG:Release>:-O3 -Ofast -march=native -ffast-math -funroll-loops>
+        $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CXX>>:-O1 -g>
+        $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:C>>:-O1 -g>
+        $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:-O3 -Ofast -march=native -ffast-math -funroll-loops>
+        $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:C>>:-O3 -Ofast -march=native -ffast-math -funroll-loops>
     )
 endif()
+
+target_compile_options(Axium PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>: -std=c++17>
+    $<$<COMPILE_LANGUAGE:CUDA>: --expt-relaxed-constexpr>
+)
 
 target_include_directories(Axium PUBLIC
     ${CUDA_INCLUDE_DIR}

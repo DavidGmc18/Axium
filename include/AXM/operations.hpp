@@ -1,6 +1,6 @@
 #pragma once
 
-#include "api.hpp"
+#include "AXM/api.hpp"
 
 namespace axm::op {
     AXM_API void sgemm_naive(
@@ -21,4 +21,16 @@ namespace axm::op {
         const float& beta,
         float* C, size_t ldc
     );
+    
+    namespace cuda {
+        template<const int BLOCK_SIZE>
+        AXM_API void sgemm_naive(
+            size_t M, size_t N, size_t K,
+            const float& alpha,
+            const float* A, size_t lda, bool trana,
+            const float* B, size_t ldb, bool tranb,
+            const float& beta,
+            float* C, size_t ldc
+        );
+    }
 }

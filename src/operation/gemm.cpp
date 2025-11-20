@@ -141,10 +141,10 @@ void sgemm(
         }
     } 
 }
-#define kernel(CM, CN, CK) template void sgemm<CM, CN, CK>(size_t,size_t,size_t,const float&,const float*,size_t,bool,const float*,size_t,bool,const float&,float*,size_t);
-// kernel(6, 16, 1) // No cache loop
-kernel(24, 32, 32)
-kernel(48, 48, 48)
-kernel(96, 96, 96)
-kernel(192, 192, 192)
+#define instantiate(CM, CN, CK) template void sgemm<CM, CN, CK>(size_t,size_t,size_t,const float&,const float*,size_t,bool,const float*,size_t,bool,const float&,float*,size_t);
+// instantiation(6, 16, 1) // No cache loop
+instantiate(24, 32, 32)
+instantiate(48, 48, 48)
+instantiate(96, 96, 96)
+instantiate(192, 192, 192)
 }

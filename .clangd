@@ -10,3 +10,13 @@ CompileFlags:
 
     - -I../include
     - -I../../include
+
+  Remove:
+    - -forward-unknown-to-host-compiler
+    - -Xcompiler= /EHsc
+    - -Xcompiler= -Zi -Ob0 -Od /RTC1
+    - --generate-code=arch=compute_86,code=[compute_86,sm_86]
+    - -Xcompiler=-MDd
+    - --expt-relaxed-constexpr
+    - -rdc=true
+    - -Xcompiler=-FdCMakeFiles\Axium.dir\,-FS
